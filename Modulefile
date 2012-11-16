@@ -1,0 +1,12 @@
+name 'yguenane-gitlab'
+version '0.0.1'
+summary 'A Gitlab Puppet module'
+description "This module aims to install gitlab'
+license 'GPLv3'
+dependency 'yguenane/gitolite', '>= 0.0.1'
+dependency 'yguenane/git', '>= 0.0.1'
+dependency 'puppetslab/mysql', '>= 0.0.1'
+author 'Yanis Guenane'
+source 'https://github.com/Spredzy/puppet-gitlab'
+project_page 'https://github.com/Spredzy/puppet-gitlab'
+
