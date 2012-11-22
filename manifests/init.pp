@@ -7,62 +7,82 @@ class gitlab (
   $gitlab_user = $gitlab::params::gitlab_user,
   $home_gitlab_user = $gitlab::params::home_gitlab_user) inherits gitlab::params {
 
-  Class['gitolite'] -> Class['mysql::server'] -> Class['gitlab']
+  Class['ruby'] -> Class['gitolite'] -> Class['mysql::server'] -> Class['gitlab']
 
-  $gitolite_user = $git::params::gitolite_user
-  $home_gitolite_user = $git::params::home_gitolite_user
+  $gitolite_user = $gitlab::params::gitolite_user
+  $home_gitolite_user = $gitlab::params::home_gitolite_user
+
+  class {'ruby' :
+    provider => 'source',
+    version  => '1.9.3-p194',
+  }
 
   class {'gitolite' :
-    $gitolite_admin_user      => $gitlab_user,
-    $home_gitolite_admin_user => $home_gitlab_user,
+    gitolite_admin_user      => $gitlab_user,
+    home_gitolite_admin_user => $home_gitlab_user,
   }
 
   class {'mysql::server' :
-    config_hash => {'root_password' => 'changeit' }
+    config_hash           => {
+      'root_password'     => 'changeit',
+      'bind_address'      => false,
+    }
   }
 
-  mysql::db {'gitlabhq_production' :
-    ensure   => present,
-    user     => 'gitlab',
-    password => 'changeit',
-    host     => 'localhost',
-    grant    => ['all'],
-    require  => Class['mysql::server'],
+  exec {"mysql -uroot -e 'CREATE DATABASE IF NOT EXISTS gitlabhq_production DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci'" :
+    cwd     => '/',
+    path    => '/usr/bin',
+    require =>  Class['mysql::server'],
+  }
+
+  exec {"mysql -uroot -e 'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER ON gitlabhq_production.* TO gitlab@\"${ipaddress}\" identified by \"changeit\"'" :
+    cwd     => '/',
+    path    => '/usr/bin',
+    require =>  Exec["mysql -uroot -e 'CREATE DATABASE IF NOT EXISTS gitlabhq_production DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci'"],
+    before  =>  Exec["git clone -b stable ${gitlab_github_url} gitlab"],
   }
 
   package {[$gitlab::params::packages] :
     ensure => latest,
+    before =>  Exec["git clone -b stable ${gitlab_github_url} gitlab"],
+    notify => Service['redis'],
   }
 
-  exec {"curl -L ${gitlab::params::ruby_url} | tar -xzvf - && cd ruby-${gitlab::params::ruby_version_long} && ./configure && make && make install" :
-    cwd    => '/tmp',
-    path   => ['/usr/bin', '/usr/local/bin'],
-    unless =>  'ruby -v',
+  service {'redis' :
+    ensure     => running,
+    hasrestart => true,
+    hasstatus  => true,
+    enable     => true,
   }
 
-  create_resources('package', $gitlab::params::gem_packages, {ensure =>  installed, provider => gem,})
+  create_resources('package', $gitlab::params::gem_packages, {provider =>   gem, source => 'http://rubygems.org/', before => Exec["git clone -b stable ${gitlab_github_url} gitlab"],})
 
   #
   # Making gitolite repositories folder readable for gitlab
   #
-  file {'/var/lib/gitolite/repositories' :
-    ensure => directory,
-    owner  => 'gitolite',
-    group  => 'gitolite',
-    mode   => '0770',
+  file {['/var/lib/gitolite/repositories', '/var/lib/gitolite/.gitolite'] :
+    ensure  => directory,
+    owner   => 'gitolite',
+    group   => 'gitolite',
+    mode    => '0770',
+    recurse => true,
+    before  => Exec["git clone -b stable ${gitlab_github_url} gitlab"],
   }
-  file {'/var/lib/gitolite/.gitolite.rc' :
+  file {'/var/lib/gitolite/.gitolite/hooks/common/post-receive' :
     ensure => present,
-    owner  => 'gitolite',
+    source => "puppet:///modules/gitlab/post-receive",
     group  => 'gitolite',
+    owner  => 'gitolite',
     mode   => '0770',
+    before =>  Exec["git clone -b stable ${gitlab_github_url} gitlab"],
   }
-  file {'/var/lib/gitolite/hooks/common/post-receive' :
-    ensure => present,
-    source => "pupet:///modules/gitlab/post-receive",
-    group  => 'gitolite',
-    owner  => 'gitolite',
-    mode   => '0770',
+  file {"${home_gitlab_user}/.ssh/known_hosts" :
+    ensure  => present,
+    owner   => $gitlab_user,
+    group   => $gitlab_user,
+    mode    => '0600',
+    content => "${ipaddress} ssh-rsa /* INSERT HERE THE CONTENT OF /etc/ssh/ssh_known_hosts*/",
+    before =>  Exec["git clone -b stable ${gitlab_github_url} gitlab"],
   }
 
   exec {"git clone -b stable ${gitlab_github_url} gitlab" :
@@ -70,7 +90,7 @@ class gitlab (
     environment =>  ["HOME=${home_gitlab_user}"],
     user        =>  $gitlab_user,
     path        =>  ['/bin', '/usr/bin'],
-    unless     =>  "ls ${home_gitlab_user}/gitlab"
+    unless      =>  "ls ${home_gitlab_user}/gitlab"
   }
 
   file {"${home_gitlab_user}/gitlab/config/gitlab.yml" :
@@ -94,42 +114,16 @@ class gitlab (
   Exec {
     user => $gitlab_user,
     environment  => ["HOME=${home_gitlab_user}"],
-    cwd  => $home_gitlab_user,
-    path => '/usr/local/bin/',
+    cwd  => "${home_gitlab_user}/gitlab",
+    path => ['/usr/local/bin','/bin','/usr/bin','/usr/local/sbin','/usr/sbin','/sbin'],
   }
-  exec {'bundle install --without development test sqlite postgres  --deployment' : 
+  exec {'bundle install --without development test sqlite postgres  --deployment' :
     require =>  [File["${home_gitlab_user}/gitlab/config/gitlab.yml"], File["${home_gitlab_user}/gitlab/config/database.yml"]]
   }
-  exec {'bundle exec rake gitlab:app:setup RAILS_ENV=production' : 
+  exec {'bundle exec rake gitlab:app:setup RAILS_ENV=production' :
     require =>  Exec['bundle install --without development test sqlite postgres  --deployment'],
   }
-  exec {'bundle exec rake gitlab:app:status RAILS_ENV=production' : 
+  exec {'bundle exec rake gitlab:app:status RAILS_ENV=production' :
     require =>  Exec['bundle exec rake gitlab:app:setup RAILS_ENV=production'],
   }
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
