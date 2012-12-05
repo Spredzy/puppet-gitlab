@@ -4,11 +4,11 @@
 production:
   adapter: postgresql
   encoding: unicode
-  database: gitlabhq_production
+  database: <%= db_name %>
   pool: 5
-  username: postgres
-  password:
-  # host: localhost
+  username: <%= db_user %>
+  password: 'changeit'
+  host: <%= ipaddress %>
   # socket: /tmp/postgresql.sock
 
 #

@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+# unicorn-<%= gitlab_user %>          Start/Stop the unicorn-<%= gitlab_user %>  daemon.
+#
+# chkconfig: 2345 20 80
+# description: This init script starts the unicorn daemon \
+#              corresponding to the gitlab instances it belongs to
+
+### BEGIN INIT INFO
+# Provides:
+# Required-Start: $local_fs $syslog
+# Required-Stop: $local_fs $syslog
+# Default-Start:  2345
+# Default-Stop: 80
+# Short-Description: run unicorn-<%= gitlab_user %> daemon
+# Description:
+### END INIT INFO
+
+. /etc/rc.d/init.d/functions
+
+name="unicorn"
+exec="/usr/local/bin/$name"
+pidfile="/var/run/$name.pid"
+
+lockfile=/var/lock/subsys/unicorn
+
+start() {
+    [ -x $exec ] || exit 5
+    echo -n $"Starting $name: "
+    daemon " su - <%= gitlab_user %> -c 'cd <%= home_gitlab_user %>/gitlab && /usr/local/bin/bundle exec unicorn -c config/unicorn.rb -E production -D'"
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+    return $retval
+}
+
+stop () {
+    echo -n $"Stopping $name: "
+    kill -9 `pidof -o %PPID /usr/local/bin/ruby`
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+restart () {
+	stop
+	start
+}
+
+rh_status() {
+    status -p $pidfile $name
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+case "$1" in
+	start)
+        	rh_status_q && exit 0
+		$1
+		;;
+	stop)
+		$1
+		;;
+	restart)
+		$1
+		;;
+	*)
+		echo "Usage $0 {start|stop|restart}"
+		exit 2
+esac
+exit $?
