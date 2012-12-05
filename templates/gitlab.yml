@@ -66,11 +66,11 @@ omniauth:
 
 # Git Hosting configuration
 git_host:
-  admin_uri: <%= gitolite_user %>@<%= ipaddress %>:gitolite-admin
-  base_path: <%= home_gitolite_user %>/repositories/
-  hooks_path: <%= home_gitolite_user %>/.gitolite/hooks/
-  gitolite_admin_key: <%= gitlab_user %>
-  git_user: <%= gitolite_user %>
+  admin_uri: gitolite_<%= user %>@<%= ipaddress %>:gitolite-admin
+  base_path: <%= gitolite_home %>/repositories/
+  hooks_path: <%= gitolite_home %>/.gitolite/hooks/
+  gitolite_admin_key: gitlab_<%= user %>
+  git_user: gitolite_<%= user %>
   upload_pack: true
   receive_pack: true
   host: <%= ipaddress %>
