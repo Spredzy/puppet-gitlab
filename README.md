@@ -1,4 +1,4 @@
-puppet-gitolite
+puppet-gitlab
 ===============
 
-A Puppet module that install and configure gitolite
+A Puppet module that install and configure gitlab

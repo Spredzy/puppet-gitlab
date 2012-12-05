@@ -7,7 +7,7 @@ class gitlab () {
 
   Class['ruby'] -> Class['gitolite'] -> Class['apache'] -> Class['mysql::server'] -> Class['gitlab']
 
-  include gitlab::params, gitolite
+  include gitlab::params, gitolite, apache
 
   class {'ruby' :
     provider => 'source',
