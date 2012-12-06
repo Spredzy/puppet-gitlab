@@ -13,20 +13,22 @@ define gitlab::instance(
 
   case $known_hosts_encryptions {
       'dsa' : {
-        $ssh_pub = $host_dsa_key
+        $ssh_known_hosts_key  = $sshdsakey
+        $type_encryption      = 'ssh-dss'
       }
       default : {
-        $ssh_pub = $host_rsa_key
+        $ssh_known_hosts_key  = $sshrsakey
+        $type_encryption      = 'ssh-rsa'
       }
   }
 
   $gitolite_home          = "/opt/gitolite-${name}"
   $db_name                = "gitlabhq_production_${user}"
   $db_user                = "gitlab_${user}"
-  $ssh_known_hosts_key    = get_ssh_known_hosts_key($ssh_pub)
   $cnt                    = is_ssh_pub_key_present($base_path)
   $port                   = $gitlab::params::port
   $unicorn_work_processes = $gitlab::params::unicorn_work_processes
+  $httpd                  = $gitlab::params::httpd
 
 
 
@@ -116,8 +118,8 @@ define gitlab::instance(
 
   sshkey {"gitlab_${user}@${hostname}" :
     ensure => present,
-    key    => $ssh_known_hosts_key["key"],
-    type   => $ssh_known_hosts_key["type"],
+    key    => $ssh_known_hosts_key,
+    type   => $type_encryption,
     name   => $ipaddress,
     before => Exec["git clone -b stable ${gitlab::params::gitlab_github_url} gitlab"],
   }
@@ -226,12 +228,13 @@ define gitlab::instance(
     mode    => '0644',
     content => template("gitlab/vhost-unicorn.conf"),
     require => Exec['bundle exec unicorn -c config/unicorn.rb -E production -D'],
-    notify  => Exec['httpd'],
+    notify  => Exec["${user} apache reload"],
   }
   exec {"${user} apache reload" :
     user    => 'root',
     cwd     => '/',
-    command => "/sbin/service ${gitlab::params::httpd} reload",
+    command => "service ${httpd} reload",
+    path    =>  ['/usr/local/bin','/bin','/usr/bin','/usr/local/sbin','/usr/sbin','/sbin'],
   }
 
 

@@ -7,7 +7,7 @@ class gitlab () {
 
   Class['ruby'] -> Class['gitolite'] -> Class['mysql::server'] -> Class['gitlab']
 
-  include gitlab::params, gitolite, apache, apache::mod::proxy
+  include gitlab::params, gitolite,  apache, apache::mod::proxy
 
   class {'ruby' :
     provider => 'source',
@@ -18,6 +18,15 @@ class gitlab () {
     config_hash           => {
       'root_password'     => 'changeit',
       'bind_address'      => false,
+    }
+  }
+
+  if $::osfamily == 'Debian' {
+    exec {'a2enmod proxy_balancer proxy_http rewrite && service apache2 restart' :
+      user    => 'root',
+      cwd     => '/etc/apache2/mods-available/',
+      path    =>  ['/usr/local/bin','/bin','/usr/bin','/usr/local/sbin','/usr/sbin','/sbin'],
+      require => Class['apache::mod::proxy']
     }
   }
 
