@@ -6,27 +6,28 @@
 define gitlab::instance(
   $version                  = '3.1',
   $user                     = $name,
-  $known_hosts_encryption  =  'rsa',
+  $known_hosts_encryption   =  'rsa',
   $base_path                = "/opt/gitlab-${name}") {
 
   require gitlab
 
-  $gitolite_home = "/opt/gitolite-${name}"
-  $db_name = "gitlabhq_production_${user}"
-  $db_user = "gitlab_${user}"
-  $ssh_known_hosts_key = get_ssh_known_hosts_key(file("/etc/ssh/ssh_host_${known_hosts_encryption}_key.pub"))
-  $cnt = is_ssh_pub_key_present($base_path)
-  $port = $gitlab::params::port
-  $unicorn_work_processes = $gitlab::params::unicorn_work_processes
-
   case $known_hosts_encryptions {
       'dsa' : {
-        $type_encryption = 'ssh-dss'
+        $ssh_pub = $host_dsa_key
       }
       default : {
-        $type_encryption = 'ssh-rsa'
+        $ssh_pub = $host_rsa_key
       }
   }
+
+  $gitolite_home          = "/opt/gitolite-${name}"
+  $db_name                = "gitlabhq_production_${user}"
+  $db_user                = "gitlab_${user}"
+  $ssh_known_hosts_key    = get_ssh_known_hosts_key($ssh_pub)
+  $cnt                    = is_ssh_pub_key_present($base_path)
+  $port                   = $gitlab::params::port
+  $unicorn_work_processes = $gitlab::params::unicorn_work_processes
+
 
 
   #
@@ -115,8 +116,8 @@ define gitlab::instance(
 
   sshkey {"gitlab_${user}@${hostname}" :
     ensure => present,
-    key    => $ssh_known_hosts_key,
-    type   => $type_encryption,
+    key    => $ssh_known_hosts_key["key"],
+    type   => $ssh_known_hosts_key["type"],
     name   => $ipaddress,
     before => Exec["git clone -b stable ${gitlab::params::gitlab_github_url} gitlab"],
   }
@@ -218,14 +219,19 @@ define gitlab::instance(
     require     => Exec['bundle exec rake gitlab:app:status RAILS_ENV=production'],
   }
 
-  file {"/etc/httpd/conf.d/10-gitlab.conf" :
+  file {"${gitlab::params::vhost_path}/10-gitlab-${user}.conf" :
     ensure  => present,
     owner   => 'root',
     group   => 'root',
     mode    => '0644',
-    content => templates("gitlab/vhost-unicorn.conf"),
-    require =>  Exec['bundle exec unicorn -c config/unicorn.rb -E production -D'],
-    notify  => Service['apache'],
+    content => template("gitlab/vhost-unicorn.conf"),
+    require => Exec['bundle exec unicorn -c config/unicorn.rb -E production -D'],
+    notify  => Exec['httpd'],
+  }
+  exec {"${user} apache reload" :
+    user    => 'root',
+    cwd     => '/',
+    command => "/sbin/service ${gitlab::params::httpd} reload",
   }
 
 
