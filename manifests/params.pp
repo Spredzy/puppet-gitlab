@@ -2,12 +2,16 @@ class gitlab::params () {
 
   case $::osfamily {
     'RedHat' : {
-      $packages = ['python-pygments', 'mysql-devel', 'redis']
-      $redis = 'redis'
+      $packages   = ['python-pygments', 'mysql-devel', 'redis']
+      $redis      = 'redis'
+      $vhost_path = '/etc/httpd/conf.d/'
+      $hhtpd      = 'httpd'
     }
     'Debian' : {
-      $packages = ['python-pygments', 'libmysqlclient-dev', 'redis-server']
-      $redis = 'redis-server'
+      $packages   = ['python-pygments', 'libmysqlclient-dev', 'redis-server']
+      $redis      = 'redis-server'
+      $vhost_path = '/etc/apache2/sites-enabled/'
+      $httpd      = 'apache2'
     }
     default : {
       fail("Unsupported OS : $::osfamily - Get in touch with the Module maintainer to see how we can fix that")
@@ -43,6 +47,6 @@ class gitlab::params () {
   # Unicorn Parameters
   #
   $unicorn_work_processes = 4
-  $port = '8080'
+  $port = 8080
 
 }

@@ -5,9 +5,9 @@
 #
 class gitlab () {
 
-  Class['ruby'] -> Class['gitolite'] -> Class['apache'] -> Class['mysql::server'] -> Class['gitlab']
+  Class['ruby'] -> Class['gitolite'] -> Class['mysql::server'] -> Class['gitlab']
 
-  include gitlab::params, gitolite, apache
+  include gitlab::params, gitolite, apache, apache::mod::proxy
 
   class {'ruby' :
     provider => 'source',
