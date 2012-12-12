@@ -1,0 +1,55 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides: unicorn
+# Required-Start: $local_fs $network $syslog $remote_fs mysqld apache2
+# Required-Stop: $local_fs $network $syslog $remote_fs myqld apache2
+# Should-start:
+# Should-stop:
+# Default-Start: 3 4 5
+# Default-Stop: 0 1 2 6
+# Short-Description: Start the Unicorn HTTP server
+# Description: Start the Unicorn HTTP server
+### END INIT INFO
+
+. /lib/lsb/init-functions
+
+USER="gitlab_<%= user %>"
+APP_HOME="<%= base_path %>/gitlab"
+EXEC='/usr/local/bin/bundle'
+DAEMON_OPTS="exec unicorn -E production -D"
+
+start() {
+    log_daemon_msg "Starting ${USER}"
+    start-stop-daemon --start --quiet --oknodo --chuid $USER:$USER --chdir $APP_HOME --exec $EXEC -- $DAEMON_OPTS
+    log_end_msg $?
+}
+
+stop() {
+    log_daemon_msg "Stopping ${USER}"
+    start-stop-daemon --stop --quiet --oknodo --user $USER
+    log_end_msg $?
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  status)
+    if [ `ps -U ${USER} | wc -l` -ne 1 ];then
+	echo "${USER} is running"
+    else
+	echo "${USER} is not running"
+    fi
+    ;;
+  *)
+    log_warning_msg "Usage: /etc/init.d/${USER} {start|stop|restart|status}"
+    exit 1
+esac

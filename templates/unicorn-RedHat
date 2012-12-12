@@ -1,0 +1,60 @@
+#!/bin/bash
+# unicorn  This shell script enables the unicorn server.
+#
+# chkconfig: - 65 45
+#
+# description: Server for the puppet system management tool.
+# processname: unicorn
+
+. /etc/init.d/functions
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+export PATH
+
+USER="gitlab_<%= user %>"
+APP_HOME="<%= base_path %>/gitlab"
+EXEC='/usr/local/bin/bundle'
+DAEMON_OPTS="exec unicorn -E production -D"
+lockfile="/var/lock/subsys/${USER}"
+
+start() {
+    [ -x $EXEC ] || exit 5
+    echo -n $"Starting $USER: "
+    daemon --user $USER "cd $APP_HOME && $EXEC $DAEMON_OPTS"
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+    return $retval
+}
+
+stop() {
+    echo -n $"Stopping $USER: "
+    killall -u ${USER}
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  status)
+    if [ `ps -U ${USER} | wc -l` -ne 1 ];then
+	echo "${USER} is running"
+    else
+	echo "${USER} is not running"
+    fi
+    ;;
+  *)
+    log_warning_msg "Usage: /etc/init.d/${USER} {start|stop|restart|status}"
+    exit 1
+esac
